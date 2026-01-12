@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <title>San Cayetano - Cotizaciones</title>
+    <meta name="description" content="Cotizaciones actualizadas de divisas en Saltos del Guairá">
+    
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#000000">
+    
+    <!-- iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    
+    <!-- Estilos críticos inline -->
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #000; color: #fff; font-family: Arial, sans-serif; min-height: 100vh; }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .header-container { display: flex; align-items: center; gap: 20px; padding-bottom: 20px; }
+        .logo-image img { width: 55px; height: 55px; border-radius: 50%; object-fit: cover; }
+        .logo-text { display: flex; flex-direction: column; }
+        .logo-line-1, .logo-line-2 { font-size: 20px; color: #fff; line-height: 1; }
+        .logo-line-1 { margin-bottom: 5px; }
+        .main-title { margin-bottom: 15px; }
+        .main-title h1 { font-size: 22px; color: #fff; letter-spacing: 1px; }
+        .location { margin-bottom: 40px; }
+        .location h2 { font-size: 15px; color: #bfbfbf; font-style: italic; }
+        .cotizaciones-container { margin-bottom: 30px; }
+        .header-row, .data-row { display: grid; grid-template-columns: 1.8fr 1.2fr 1.2fr; gap: 20px; padding: 0 10px 20px; border-bottom: 1px solid #303030; }
+        .data-row { padding: 15px 10px; }
+        .data-row:last-child { border-bottom: none; }
+        .header-column { font-size: 14px; font-weight: bold; color: #bfbfbf; text-transform: uppercase; padding: 10px 20px; }
+        .header-column.moneda { text-align: left; padding-left: 10px; }
+        .header-column:not(.moneda) { text-align: center; }
+        .moneda-con-bandera { display: flex; align-items: center; gap: 12px; }
+        .bandera { font-size: 24px; min-width: 30px; text-align: center; }
+        .nombre { font-size: 20px; color: #fff; }
+        .valor { font-size: 24px; color: #fff; font-variant-numeric: tabular-nums; }
+        .valor-container { display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .price-change { font-size: 16px; }
+        .price-change.hidden { display: none; }
+        .price-change.up { color: #4CAF50; }
+        .price-change.down { color: #f44336; }
+        .update-button-container { margin-top: 40px; display: flex; justify-content: center; }
+        .update-button { min-width: 250px; background: #303030; color: #fff; border: 1px solid #303030; padding: 16px 32px; border-radius: 12px; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 12px; cursor: pointer; }
+        .update-button:hover { background: #404040; }
+        
+        @keyframes spin { 0% { transform: rotate(0); } 100% { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes highlightUpdate { 0% { color: #4CAF50; } 100% { color: #fff; } }
+        
+        .update-button.updating { background: #1976D2; border-color: #1976D2; }
+        .update-button.updating i { animation: spin 1s linear infinite; }
+        .update-button.success { background: #4CAF50; border-color: #4CAF50; }
+        .update-button.error { background: #f44336; border-color: #f44336; }
+        .valor.updated { animation: highlightUpdate 1s ease; }
+        .price-change { animation: fadeIn 0.5s ease; }
+    </style>
+    
+    <!-- Estilos diferidos -->
+    <link rel="stylesheet" href="style.css" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="style.css"></noscript>
+    
+    <!-- Fuentes diferidas -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+</head>
+<body>
+    <main class="container">
+        <header>
+            <div class="header-container">
+                <div class="logo-image">
+                    <img src="san caye 2.PNG" alt="Logo San Cayetano" width="55" height="55" loading="eager">
+                </div>
+                <div class="logo-text">
+                    <div class="logo-line-1">San</div>
+                    <div class="logo-line-2">Cayetano</div>
+                </div>
+            </div>
+        </header>
+
+        <div class="main-title">
+            <h1>Cotizaciones</h1>
+            <div class="location">
+                <h2>Saltos del Guairá</h2>
+            </div>
+        </div>
+
+        <div class="cotizaciones-container" id="cotizacionesTable">
+            <div class="header-row">
+                <div class="header-column moneda">MONEDA</div>
+                <div class="header-column">COMPRA</div>
+                <div class="header-column">VENTA</div>
+            </div>
+
+            <div class="data-row" id="dolarRow">
+                <div class="data-column moneda-info">
+                    <div class="moneda-con-bandera">
+                        <img src="usa_flags.png" alt="usa" width="28" height="28"> 
+                        <span class="nombre">USD</span>
+                    </div>
+                </div>
+                <div class="data-column compra-info">
+                    <div class="valor-container">
+                        <span class="valor" id="dolarCompra">6.480,00</span>
+                        <span class="price-change hidden"><i class="fas fa-arrow-up"></i></span>
+                    </div>
+                </div>
+                <div class="data-column venta-info">
+                    <div class="valor-container">
+                        <span class="valor" id="dolarVenta">6.680,00</span>
+                        <span class="price-change hidden"><i class="fas fa-arrow-up"></i></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="data-row" id="realRow">
+                <div class="data-column moneda-info">
+                    <div class="moneda-con-bandera">
+                        <img src="br_flags.png" alt="brl" width="28" height="28">
+                        <span class="nombre">BRL</span>
+                    </div>
+                </div>
+                <div class="data-column compra-info">
+                    <div class="valor-container">
+                        <span class="valor" id="realCompra">1.175,00</span>
+                        <span class="price-change hidden"><i class="fas fa-arrow-up"></i></span>
+                    </div>
+                </div>
+                <div class="data-column venta-info">
+                    <div class="valor-container">
+                        <span class="valor" id="realVenta">1.230,00</span>
+                        <span class="price-change hidden"><i class="fas fa-arrow-up"></i></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="data-row" id="realDolarRow">
+                <div class="data-column moneda-info">
+                    <div class="moneda-con-bandera">
+                        <img src="brus_flags.png" alt="brus" width="56" height="28">
+                        <span class="nombre">RBL•USD</span>
+                    </div>
+                </div>
+                <div class="data-column compra-info">
+                    <div class="valor-container">
+                        <span class="valor" id="realDolarCompra">5,42</span>
+                        <span class="price-change hidden"><i class="fas fa-arrow-up"></i></span>
+                    </div>
+                </div>
+                <div class="data-column venta-info">
+                    <div class="valor-container">
+                        <span class="valor" id="realDolarVenta">5,50</span>
+                        <span class="price-change hidden"><i class="fas fa-arrow-up"></i></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="update-button-container">
+            <button class="update-button" id="updateBtn">
+                <i class="fas fa-sync-alt"></i>
+                <span>Actualizar Cotizaciones</span>
+            </button>
+        </div>
+    </main>
+
+    <!-- JavaScript -->
+    <script>
+        // Registrar Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js');
+            });
+        }
+        
+        // Cargar app.js diferido
+        setTimeout(() => {
+            const script = document.createElement('script');
+            script.src = 'app.js';
+            script.async = true;
+            document.body.appendChild(script);
+        }, 100);
+    </script>
+</body>
+</html>

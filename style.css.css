@@ -1,0 +1,88 @@
+/* Estilos no críticos - Mobile First */
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container { padding: 15px 12px; }
+    .header-container { gap: 12px; }
+    .logo-image img { width: 45px; height: 45px; }
+    .logo-line-1, .logo-line-2 { font-size: 18px; }
+    .main-title h1 { font-size: 20px; }
+    .location h2 { font-size: 14px; }
+    .header-row, .data-row { 
+        grid-template-columns: 1.6fr 1.1fr 1.1fr; 
+        gap: 12px; 
+        padding: 0 5px 15px; 
+    }
+    .data-row { padding: 12px 5px; }
+    .bandera { font-size: 20px; min-width: 25px; }
+    .nombre { font-size: 16px; }
+    .valor { font-size: 20px; }
+    .valor-container { gap: 6px; }
+    .price-change { font-size: 14px; }
+    .update-button { 
+        min-width: 220px; 
+        padding: 14px 24px; 
+        font-size: 15px; 
+    }
+}
+
+@media (max-width: 480px) {
+    .container { padding: 12px 10px; }
+    .header-container { 
+        flex-direction: column; 
+        text-align: center; 
+        gap: 10px; 
+    }
+    .logo-image img { width: 40px; height: 40px; }
+    .logo-line-1, .logo-line-2 { font-size: 16px; }
+    .main-title h1 { 
+        font-size: 18px; 
+        text-align: center; 
+    }
+    .location h2 { 
+        font-size: 13px; 
+        text-align: center; 
+    }
+    .header-row, .data-row { 
+        grid-template-columns: 1.5fr 1fr 1fr; 
+        gap: 8px; 
+        padding: 0; 
+    }
+    .data-row { padding: 10px 0; }
+    .header-column { font-size: 12px; padding: 5px 4px; }
+    .moneda-con-bandera { gap: 6px; }
+    .bandera { font-size: 18px; min-width: 22px; }
+    .nombre { font-size: 14px; }
+    .valor { font-size: 18px; }
+    .valor-container { gap: 4px; }
+    .price-change { font-size: 12px; }
+    .update-button { 
+        min-width: 200px; 
+        padding: 12px 20px; 
+        font-size: 14px; 
+        width: 100%; 
+        max-width: 280px; 
+    }
+}
+
+/* Mejoras para PWA */
+@media (display-mode: standalone) {
+    body {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+}
+
+/* Touch optimizations */
+@media (pointer: coarse) {
+    .update-button { min-height: 44px; }
+    .data-row { padding: 16px 10px; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
