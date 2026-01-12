@@ -1,7 +1,7 @@
 class CotizacionesApp {
     constructor() {
         this.sourceUrl = 'https://www.nortecambios.com.py/';
-        this.autoUpdateInterval = 300000; // 5 minutos
+        this.autoUpdateInterval = 300000;
         this.isUpdating = false;
         this.firstUpdate = true;
         
@@ -37,12 +37,16 @@ class CotizacionesApp {
     startAutoUpdate() {
         setTimeout(() => {
             this.fetchCotizaciones(false);
-            setInterval(() => this.fetchCotizaciones(false), this.autoUpdateInterval);
         }, 3000);
+        
+        setInterval(() => {
+            this.fetchCotizaciones(false);
+        }, this.autoUpdateInterval);
     }
 
     async manualUpdate() {
         if (this.isUpdating) return;
+        
         this.isUpdating = true;
         this.showUpdatingState();
         
@@ -50,7 +54,6 @@ class CotizacionesApp {
             await this.fetchCotizaciones(true);
             this.showSuccessState();
         } catch (error) {
-            console.error('Error:', error);
             this.showErrorState();
         } finally {
             setTimeout(() => {
@@ -97,11 +100,14 @@ class CotizacionesApp {
 
     async fetchCotizaciones(showFeedback = false) {
         try {
+            // Usar proxy para evitar CORS
             const proxyUrl = 'https://api.allorigins.win/raw?url=';
             const targetUrl = encodeURIComponent(this.sourceUrl);
             
             const response = await fetch(`${proxyUrl}${targetUrl}`, {
-                headers: { 'User-Agent': 'Mozilla/5.0' }
+                headers: { 
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
             });
             
             if (!response.ok) throw new Error(`Error: ${response.status}`);
@@ -110,51 +116,108 @@ class CotizacionesApp {
             await this.parseCotizaciones(html);
             
         } catch (error) {
-            console.error('Error al obtener:', error);
             if (showFeedback) throw error;
         }
     }
 
     async parseCotizaciones(html) {
-        const oldValues = { ...this.cotizaciones };
-        const pageText = html.toLowerCase();
+        const oldValues = JSON.parse(JSON.stringify(this.cotizaciones));
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const pageText = doc.body.textContent || '';
         
-        // Buscar dólar
-        const dolarMatch = /dólar.*?(\d[\d.,]+).*?(\d[\d.,]+)/.exec(pageText);
-        if (dolarMatch) {
-            this.cotizaciones.dolar.compra = this.parseNumber(dolarMatch[1]);
-            this.cotizaciones.dolar.venta = this.parseNumber(dolarMatch[2]);
-        }
+        // Buscar dólar con patrones más flexibles
+        this.buscarDolar(pageText);
         
         // Buscar real
-        const realMatch = /real.*?(\d[\d.,]+).*?(\d[\d.,]+)/.exec(pageText);
-        if (realMatch) {
-            this.cotizaciones.real.compra = this.parseNumber(realMatch[1]);
-            this.cotizaciones.real.venta = this.parseNumber(realMatch[2]);
-        }
+        this.buscarReal(pageText);
         
-        // Calcular real-dólar
+        // Calcular Real-Dólar si no se encuentra
+        this.calcularRealDolar();
+        
+        // Actualizar si hay cambios
+        if (this.hayCambios(oldValues)) {
+            this.updateDisplay();
+        }
+    }
+
+    buscarDolar(texto) {
+        const patrones = [
+            /dólar.*?(\d[\d.,]+)\D+(\d[\d.,]+)/i,
+            /dolar.*?(\d[\d.,]+)\D+(\d[\d.,]+)/i,
+            /usd.*?(\d[\d.,]+)\D+(\d[\d.,]+)/i,
+            /compra.*?dólar.*?(\d[\d.,]+)/i,
+            /venta.*?dólar.*?(\d[\d.,]+)/i
+        ];
+        
+        for (const patron of patrones) {
+            const match = patron.exec(texto);
+            if (match) {
+                if (match[1] && match[2]) {
+                    // Tiene compra y venta juntos
+                    this.cotizaciones.dolar.compra = this.parseNumber(match[1]);
+                    this.cotizaciones.dolar.venta = this.parseNumber(match[2]);
+                    return;
+                } else if (match[1]) {
+                    // Solo un valor
+                    const valor = this.parseNumber(match[1]);
+                    if (valor > this.cotizaciones.dolar.compra) {
+                        this.cotizaciones.dolar.venta = valor;
+                    } else {
+                        this.cotizaciones.dolar.compra = valor;
+                    }
+                }
+            }
+        }
+    }
+
+    buscarReal(texto) {
+        const patrones = [
+            /real.*?(\d[\d.,]+)\D+(\d[\d.,]+)/i,
+            /brl.*?(\d[\d.,]+)\D+(\d[\d.,]+)/i,
+            /r\$.?(\d[\d.,]+)\D+(\d[\d.,]+)/i
+        ];
+        
+        for (const patron of patrones) {
+            const match = patron.exec(texto);
+            if (match && match[1] && match[2]) {
+                this.cotizaciones.real.compra = this.parseNumber(match[1]);
+                this.cotizaciones.real.venta = this.parseNumber(match[2]);
+                return;
+            }
+        }
+    }
+
+    calcularRealDolar() {
         if (this.cotizaciones.dolar.compra > 0 && this.cotizaciones.real.compra > 0) {
             this.cotizaciones.realDolar.compra = this.cotizaciones.dolar.compra / this.cotizaciones.real.compra;
             this.cotizaciones.realDolar.venta = this.cotizaciones.dolar.venta / this.cotizaciones.real.venta;
+            
             this.cotizaciones.realDolar.compra = Math.round(this.cotizaciones.realDolar.compra * 10000) / 10000;
             this.cotizaciones.realDolar.venta = Math.round(this.cotizaciones.realDolar.venta * 10000) / 10000;
         }
-        
-        if (this.hayCambios(oldValues)) this.updateDisplay();
     }
 
     parseNumber(text) {
         if (!text) return 0;
-        const cleaned = text.replace(/[^\d,.-]/g, '').replace(/\.(?=\d{3})/g, '').replace(',', '.');
-        const num = parseFloat(cleaned);
-        return isNaN(num) ? 0 : Math.round(num * 100) / 100;
+        
+        const cleaned = String(text)
+            .replace(/[^\d,.-]/g, '')
+            .replace(/\.(?=\d{3})/g, '')
+            .replace(',', '.');
+            
+        const number = parseFloat(cleaned);
+        return isNaN(number) ? 0 : Math.round(number * 100) / 100;
     }
 
     hayCambios(oldValues) {
-        return Object.keys(oldValues).some(moneda => 
-            oldValues[moneda].compra !== this.cotizaciones[moneda].compra ||
-            oldValues[moneda].venta !== this.cotizaciones[moneda].venta
+        return (
+            oldValues.dolar.compra !== this.cotizaciones.dolar.compra ||
+            oldValues.dolar.venta !== this.cotizaciones.dolar.venta ||
+            oldValues.real.compra !== this.cotizaciones.real.compra ||
+            oldValues.real.venta !== this.cotizaciones.real.venta ||
+            oldValues.realDolar.compra !== this.cotizaciones.realDolar.compra ||
+            oldValues.realDolar.venta !== this.cotizaciones.realDolar.venta
         );
     }
 
@@ -166,7 +229,9 @@ class CotizacionesApp {
         this.updateValueWithArrow('realDolarCompra', this.cotizaciones.realDolar.compra, 'realDolar', 'compra', 4);
         this.updateValueWithArrow('realDolarVenta', this.cotizaciones.realDolar.venta, 'realDolar', 'venta', 4);
         
-        if (!this.firstUpdate) this.saveCurrentAsPrevious();
+        if (!this.firstUpdate) {
+            this.saveCurrentAsPrevious();
+        }
         this.firstUpdate = false;
     }
 
@@ -175,30 +240,35 @@ class CotizacionesApp {
         if (!element) return;
         
         const formattedValue = this.formatNumber(value, decimals);
-        let container = element.parentElement;
         
+        // Asegurar contenedor con flecha
+        let container = element.parentElement;
         if (!container.classList.contains('valor-container')) {
             const newContainer = document.createElement('div');
             newContainer.className = 'valor-container';
             element.parentElement.replaceChild(newContainer, element);
             newContainer.appendChild(element);
             
-            const arrow = document.createElement('span');
-            arrow.className = 'price-change hidden';
-            arrow.innerHTML = '<i class="fas fa-arrow-up"></i>';
-            newContainer.appendChild(arrow);
+            const arrowSpan = document.createElement('span');
+            arrowSpan.className = 'price-change hidden';
+            arrowSpan.innerHTML = '<i class="fas fa-arrow-up"></i>';
+            newContainer.appendChild(arrowSpan);
+            
             container = newContainer;
         }
         
+        // Manejar flecha
         const arrow = container.querySelector('.price-change');
         
         if (!this.firstUpdate && this.previousValues[currency][type] !== 0) {
-            const prev = this.previousValues[currency][type];
-            if (value > prev) {
+            const previous = this.previousValues[currency][type];
+            const current = value;
+            
+            if (current > previous) {
                 arrow.className = 'price-change up';
                 arrow.innerHTML = '<i class="fas fa-arrow-up"></i>';
                 arrow.classList.remove('hidden');
-            } else if (value < prev) {
+            } else if (current < previous) {
                 arrow.className = 'price-change down';
                 arrow.innerHTML = '<i class="fas fa-arrow-down"></i>';
                 arrow.classList.remove('hidden');
@@ -211,6 +281,7 @@ class CotizacionesApp {
             arrow.classList.add('hidden');
         }
         
+        // Actualizar valor
         if (element.textContent !== formattedValue) {
             element.textContent = formattedValue;
             element.classList.add('updated');
@@ -219,14 +290,19 @@ class CotizacionesApp {
     }
 
     saveCurrentAsPrevious() {
-        Object.keys(this.cotizaciones).forEach(moneda => {
-            this.previousValues[moneda].compra = this.cotizaciones[moneda].compra;
-            this.previousValues[moneda].venta = this.cotizaciones[moneda].venta;
-        });
+        this.previousValues.dolar.compra = this.cotizaciones.dolar.compra;
+        this.previousValues.dolar.venta = this.cotizaciones.dolar.venta;
+        this.previousValues.real.compra = this.cotizaciones.real.compra;
+        this.previousValues.real.venta = this.cotizaciones.real.venta;
+        this.previousValues.realDolar.compra = this.cotizaciones.realDolar.compra;
+        this.previousValues.realDolar.venta = this.cotizaciones.realDolar.venta;
     }
 
     formatNumber(num, decimals = 2) {
-        if (num === 0 || isNaN(num)) return decimals === 4 ? '--,----' : '--.--';
+        if (num === 0 || isNaN(num)) {
+            return decimals === 4 ? '--,----' : '--.--';
+        }
+        
         return num.toLocaleString('es-PY', {
             minimumFractionDigits: decimals,
             maximumFractionDigits: decimals
@@ -235,6 +311,6 @@ class CotizacionesApp {
 }
 
 // Inicializar
-window.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
     window.app = new CotizacionesApp();
 });
